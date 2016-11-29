@@ -23,6 +23,7 @@
 #include "asio/detail/reactor.hpp"
 #include "asio/detail/scheduler.hpp"
 #include "asio/detail/scheduler_thread_info.hpp"
+#include "asio/io_context.hpp"
 
 #include "asio/detail/push_options.hpp"
 
@@ -97,7 +98,14 @@ scheduler::scheduler(
     outstanding_work_(0),
     stopped_(false),
     shutdown_(false),
-    concurrency_hint_(concurrency_hint)
+    concurrency_hint_(concurrency_hint),
+    can_spawn_(false),
+    MAXPROCS_(10),
+    current_procs_(0),
+    conns_num_(0),
+    priv_conns_num_(0),
+    distribute_lock_(distribute_mutex_),
+    root_(this)
 {
   ASIO_HANDLER_TRACKING_INIT;
 }
@@ -145,10 +153,18 @@ std::size_t scheduler::run(asio::error_code& ec)
   this_thread.private_outstanding_work = 0;
   thread_call_stack::context ctx(this, this_thread);
 
-  mutex::scoped_lock lock(mutex_);
-
   std::size_t n = 0;
-  for (; do_run_one(lock, this_thread, ec); lock.lock())
+  if(!can_spawn_)
+  {
+    mutex::scoped_lock lock(mutex_);
+
+    for (; do_run_one(lock, this_thread, ec); lock.lock())
+      if (n != (std::numeric_limits<std::size_t>::max)())
+        ++n;
+    return n;
+  }
+
+  for (; do_run_one_thread_specific(ec);)
     if (n != (std::numeric_limits<std::size_t>::max)())
       ++n;
   return n;
@@ -349,6 +365,46 @@ void scheduler::abandon_operations(
 {
   op_queue<scheduler::operation> ops2;
   ops2.push(ops);
+}
+
+std::size_t scheduler::do_run_one_thread_specific(
+    const asio::error_code &ec)
+{
+  while (!stopped_)
+  {
+    if (!op_queue_.empty())
+    {
+      operation* o = op_queue_.front();
+      op_queue_.pop();
+
+      if (o == &task_operation_)
+      {
+        // wait at most 100ms
+        task_->run(100, op_queue_);
+
+        // try to get new accepted connections from distribute_queue_
+        consume_accepted_conns();
+
+        // finally, push the task_operation_ into distribute_queue
+        op_queue_.push(&task_operation_);
+      }
+      else
+      {
+        std::size_t task_result = o->task_result_;
+
+        // Complete the operation. May throw an exception. Deletes the object.
+        o->complete(this, ec, task_result);
+        return 1;
+      }
+    }
+    else
+    {
+      distribute_event_.clear(distribute_lock_);
+      distribute_event_.wait(distribute_lock_);
+    }
+
+    return 0;
+  }
 }
 
 std::size_t scheduler::do_run_one(mutex::scoped_lock& lock,
@@ -559,6 +615,58 @@ void scheduler::wake_one_thread_and_unlock(
     }
     lock.unlock();
   }
+}
+
+void scheduler::consume_accepted_conns()
+{
+  distribute_lock_.lock();
+  asio::error_code ec;
+  while (priv_conns_num_ < (root_->conns_num_/root_->MAXPROCS_+1)
+      && !root_->distribute_queue_.empty())
+  {
+    operation* o = root_->distribute_queue_.front();
+    o->complete(this, ec, 0);
+    ++priv_conns_num_;
+    root_->distribute_queue_.pop();
+    --root_->distribute_queue_len_;
+  }
+  distribute_lock_.unlock();
+}
+
+void scheduler::spawn()
+{
+  asio::io_context spawned;
+  spawned.set_spawn(true);
+  spawned.set_root(this);
+  spawned.run();
+}
+
+// this can only be called by the root scheduler
+void scheduler::distribute(operation* op)
+{
+  distribute_lock_.lock();
+  distribute_queue_.push(op);
+  ++conns_num_;
+  ++distribute_queue_len_;
+  distribute_lock_.unlock();
+
+  if (root_->distribute_queue_len_ > 1)
+  {
+    if (root_->current_procs_ < root_->MAXPROCS_)
+    {
+      // spawn new scheduler
+      spawn();
+    }
+    else{
+      distribute_event_.unlock_and_signal_one(distribute_lock_);
+    }
+  }
+}
+
+void scheduler::set_spawn(bool b)
+{
+  can_spawn_ = b;
+  //one_thread_ = can_spawn_ ? true:one_thread_;
 }
 
 } // namespace detail

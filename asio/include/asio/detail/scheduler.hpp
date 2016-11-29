@@ -165,7 +165,7 @@ private:
   friend struct work_cleanup;
 
   // Whether to optimise for single-threaded use cases.
-  const bool one_thread_;
+  bool one_thread_;
 
   // Mutex to protect access to internal data.
   mutable mutex mutex_;
@@ -199,7 +199,71 @@ private:
 
   // The concurrency hint used to initialise the scheduler.
   const int concurrency_hint_;
+
+public:
+  mutex::scoped_lock distribute_lock_;
+  // consume accepted connections from distribute_queue_
+  void consume_accepted_conns();
+
+  // push the accept op to distribute_queue_
+  void distribute(operation* op);
+
+  // set spawn
+  void set_spawn(bool b);
+
+  // set root
+  void set_root(void* root)
+  {
+    root_ = static_cast<scheduler*>(root);
+  }
+
+private:
+  // spawn new scheduler
+  void spawn();
+
+  // Run at most one operation. May block. This function only
+  // process the operations of certain connections which are
+  // binded to the current thread(scheduler), so no lock is need
+  // unless it tries to accquired new connections
+  ASIO_DECL std::size_t do_run_one_thread_specific(
+      const asio::error_code& ec);
+
+  // Mutex to guard the global distribute_queue.
+  static mutex distribute_mutex_;
+
+  // Event to wake up blocked scheduler
+  static event distribute_event_;
+
+  // Queue to distribute operations to multiple schedulers
+  op_queue<operation> distribute_queue_;
+
+
+  // number of operations(connections) in the distribute_queue_;
+  int distribute_queue_len_;
+
+  // indicates if new scheduler can be spawned
+  bool can_spawn_;
+
+  // we can only spawn MAXPROCS_-1 new schedulers which run in their own
+  // os threads. MAXPROCS_ is the number of CPUs of the server
+  const int MAXPROCS_;
+
+  // current number of spawned schedulers
+  int current_procs_;
+
+  // number of accepted alive connections
+  int conns_num_; // TODO: decrease when connection closed
+
+  // number of connections of the current scheduler
+  int priv_conns_num_;
+
+  // root_ is the first scheduler that spawns other schedulers
+  scheduler* root_;
 };
+conditionally_enabled_mutex scheduler::distribute_mutex_(true);
+conditionally_enabled_event scheduler::distribute_event_;
+//op_queue<scheduler::operation> scheduler::distribute_queue_;
+//int scheduler::distribute_queue_len_ = 0;
 
 } // namespace detail
 } // namespace asio

@@ -218,6 +218,20 @@ public:
    */
   ASIO_DECL ~io_context();
 
+  /// Set the io_context to spawn mode. If set to true, the scheduler
+  /// will spawn new scheduler if needed. Each scheduler will only process
+  /// the operations of certain connections which are designated to themselves,
+  /// so no lock is needed.
+  void set_spawn(bool spawn);
+
+  /// set the current io_context's scheduler's root
+  void set_root(void* root);
+
+  bool can_spawn()
+  {
+    return can_spawn_;
+  }
+
   /// Obtains the executor associated with the io_context.
   executor_type get_executor() ASIO_NOEXCEPT;
 
@@ -569,6 +583,7 @@ private:
 
   // The implementation.
   impl_type& impl_;
+  bool can_spawn_;
 };
 
 /// Executor used to submit functions to an io_context.

@@ -106,6 +106,8 @@
 # endif // !defined(ASIO_DISABLE_MOVE)
 #endif // !defined(ASIO_HAS_MOVE)
 
+#define ASIO_HAS_MOVE 1
+
 // If ASIO_MOVE_CAST isn't defined, and move support is available, define
 // ASIO_MOVE_ARG and ASIO_MOVE_CAST to take advantage of rvalue
 // references and perfect forwarding.

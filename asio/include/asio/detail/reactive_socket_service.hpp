@@ -128,6 +128,26 @@ public:
     return ec;
   }
 
+  // Assign native socket fd only to impl
+  asio::error_code pre_assign(implementation_type& impl,
+      const protocol_type& protocol, const native_handle_type& native_socket,
+      asio::error_code& ec)
+  {
+    if (!do_pre_assign(impl, protocol.type(), native_socket, ec))
+      impl.protocol_ = protocol;
+    return ec;
+  }
+
+  // register socket fd to the reactor belongs to the spawned
+  // io_context
+  asio::error_code finish_assign(implementation_type& impl,
+      asio::error_code& ec)
+  {
+    do_finish_assign(impl, ec);
+    return ec;
+  }
+
+
   // Assign a native socket to a socket implementation.
   asio::error_code assign(implementation_type& impl,
       const protocol_type& protocol, const native_handle_type& native_socket,
@@ -438,7 +458,7 @@ public:
   // valid until the accept's handler is invoked.
   template <typename Socket, typename Handler>
   void async_accept(implementation_type& impl, Socket& peer,
-      endpoint_type* peer_endpoint, Handler& handler)
+      endpoint_type* peer_endpoint, Handler& handler, bool lock_free)
   {
     bool is_continuation =
       asio_handler_cont_helpers::is_continuation(handler);
@@ -449,6 +469,8 @@ public:
       op::ptr::allocate(handler), 0 };
     p.p = new (p.v) op(impl.socket_, impl.state_, peer,
         impl.protocol_, peer_endpoint, handler);
+    if(lock_free)
+      p.p->set_mode(op::LOCK_FREE);
 
     ASIO_HANDLER_CREATION((reactor_.context(), *p.p, "socket",
           &impl, impl.socket_, "async_accept"));
@@ -463,7 +485,7 @@ public:
   template <typename Handler>
   void async_accept(implementation_type& impl,
       asio::io_context* peer_io_context,
-      endpoint_type* peer_endpoint, Handler& handler)
+      endpoint_type* peer_endpoint, Handler& handler, bool lock_free)
   {
     bool is_continuation =
       asio_handler_cont_helpers::is_continuation(handler);
@@ -474,6 +496,8 @@ public:
       op::ptr::allocate(handler), 0 };
     p.p = new (p.v) op(peer_io_context ? *peer_io_context : io_context_,
         impl.socket_, impl.state_, impl.protocol_, peer_endpoint, handler);
+    if(lock_free)
+      p.p->set_mode(op::LOCK_FREE);
 
     ASIO_HANDLER_CREATION((reactor_.context(), *p.p, "socket",
           &impl, impl.socket_, "async_accept"));

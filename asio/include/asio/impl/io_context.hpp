@@ -65,6 +65,17 @@ io_context::get_executor() ASIO_NOEXCEPT
   return executor_type(*this);
 }
 
+void io_context::set_spawn(bool spawn)
+{
+  can_spawn_ = spawn;
+  impl_.set_spawn(spawn);
+}
+
+void io_context::set_root(void *root)
+{
+  impl_.set_root(root);
+}
+
 #if defined(ASIO_HAS_CHRONO)
 
 template <typename Rep, typename Period>

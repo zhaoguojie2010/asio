@@ -37,6 +37,8 @@ public:
       socket_ops::state_type state, Socket& peer, const Protocol& protocol,
       typename Protocol::endpoint* peer_endpoint, func_type complete_func)
     : reactor_op(&reactive_socket_accept_op_base::do_perform, complete_func),
+      stage_(STAGE0),
+      mode_(NORMAL),
       socket_(socket),
       state_(state),
       peer_(peer),
@@ -59,7 +61,7 @@ public:
     o->new_socket_.reset(new_socket);
 
     ASIO_HANDLER_REACTOR_OPERATION((*o, "non_blocking_accept", o->ec_));
-
+    o->next_stage();
     return result;
   }
 
@@ -72,6 +74,63 @@ public:
       peer_.assign(protocol_, new_socket_.get(), ec_);
       if (!ec_)
         new_socket_.release();
+    }
+  }
+
+public:
+  enum Mode {NORMAL, LOCK_FREE};
+  void set_mode(Mode mode)
+  {
+    mode_ = mode;
+  }
+
+protected:
+  // STAGE1: push the op into distribute_queue_
+  void assign_stage1(void* owner)
+  {
+    if (new_socket_.get() != invalid_socket)
+    {
+      scheduler* sched(static_cast<scheduler*>(owner));
+      sched->distribute(this);
+      next_stage();
+    }
+  }
+
+  // STAGE2: now the op has been extracted from the father io_context's distribute_queue_
+  //         either by father io_context or the spawned io_context, it'll be registered
+  //         to the current io_context's reactor
+  void assign_stage2(void* owner)
+  {
+    // reset the service first
+    scheduler* sched(static_cast<scheduler*>(owner));
+    io_context* io_ctx(static_cast<io_context*>(&sched->context()));
+    Socket tmp(io_ctx);
+    peer_ = ASIO_MOVE_CAST(Socket)(tmp);
+
+    do_assign();
+  }
+  Mode mode_;
+  // STAGE0: do accept
+  // STAGE1: push the op into distribute_queue_
+  // STAGE2: now the op has been extracted from the father io_context's distribute_queue_
+  //         either by father io_context or the spawned io_context, it'll be registered
+  //         to the current io_context's reactor
+  enum Stage {STAGE0=0, STAGE1, STAGE2};
+  Stage stage_;
+
+private:
+  void next_stage()
+  {
+    switch (stage_)
+    {
+      case STAGE0:
+        stage_ = STAGE1;
+        break;
+      case STAGE1:
+        stage_ = STAGE2;
+        break;
+      default:
+        return;
     }
   }
 
@@ -168,17 +227,23 @@ public:
       const asio::error_code& /*ec*/,
       std::size_t /*bytes_transferred*/)
   {
-    // Take ownership of the handler object.
     reactive_socket_move_accept_op* o(
         static_cast<reactive_socket_move_accept_op*>(base));
-    ptr p = { asio::detail::addressof(o->handler_), o, o };
-    handler_work<Handler> w(o->handler_);
 
     // On success, assign new connection to peer socket object.
     if (owner)
-      o->do_assign();
+    {
+      if(o->stage_ == base::STAGE1)
+        o->assign_stage1(owner);
+      else if(o->stage_ == base::STAGE2)
+        o->assign_stage2(owner);
+    }
 
     ASIO_HANDLER_COMPLETION((*o));
+
+    // Take ownership of the handler object.
+    ptr p = { asio::detail::addressof(o->handler_), o, o };
+    handler_work<Handler> w(o->handler_);
 
     // Make a copy of the handler so that the memory can be deallocated before
     // the upcall is made. Even if we're not about to make an upcall, a
@@ -203,7 +268,9 @@ public:
     }
   }
 
+
 private:
+  typedef reactive_socket_accept_op_base<typename Protocol::socket, Protocol> base;
   Handler handler_;
 };
 

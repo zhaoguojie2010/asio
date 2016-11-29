@@ -101,7 +101,8 @@ public:
    * acceptor.
    */
   explicit basic_socket_acceptor(asio::io_context& io_context)
-    : basic_io_object<ASIO_SVC_T>(io_context)
+    : basic_io_object<ASIO_SVC_T>(io_context),
+      can_spawn_(io_context.can_spawn())
   {
   }
 
@@ -119,7 +120,8 @@ public:
    */
   basic_socket_acceptor(asio::io_context& io_context,
       const protocol_type& protocol)
-    : basic_io_object<ASIO_SVC_T>(io_context)
+    : basic_io_object<ASIO_SVC_T>(io_context),
+      can_spawn_(io_context.can_spawn())
   {
     asio::error_code ec;
     this->get_service().open(this->get_implementation(), protocol, ec);
@@ -155,7 +157,8 @@ public:
    */
   basic_socket_acceptor(asio::io_context& io_context,
       const endpoint_type& endpoint, bool reuse_addr = true)
-    : basic_io_object<ASIO_SVC_T>(io_context)
+    : basic_io_object<ASIO_SVC_T>(io_context),
+      can_spawn_(io_context.can_spawn())
   {
     asio::error_code ec;
     const protocol_type protocol = endpoint.protocol();
@@ -191,7 +194,8 @@ public:
    */
   basic_socket_acceptor(asio::io_context& io_context,
       const protocol_type& protocol, const native_handle_type& native_acceptor)
-    : basic_io_object<ASIO_SVC_T>(io_context)
+    : basic_io_object<ASIO_SVC_T>(io_context),
+      can_spawn_(io_context.can_spawn())
   {
     asio::error_code ec;
     this->get_service().assign(this->get_implementation(),
@@ -211,7 +215,8 @@ public:
    * constructed using the @c basic_socket_acceptor(io_context&) constructor.
    */
   basic_socket_acceptor(basic_socket_acceptor&& other)
-    : basic_io_object<ASIO_SVC_T>(std::move(other))
+    : basic_io_object<ASIO_SVC_T>(std::move(other)),
+      can_spawn_(other.can_spawn_)
   {
   }
 
@@ -228,6 +233,7 @@ public:
   basic_socket_acceptor& operator=(basic_socket_acceptor&& other)
   {
     basic_io_object<ASIO_SVC_T>::operator=(std::move(other));
+    can_spawn_ = other.can_spawn_;
     return *this;
   }
 
@@ -251,7 +257,8 @@ public:
       basic_socket_acceptor<Protocol1 ASIO_SVC_TARG1>&& other,
       typename enable_if<is_convertible<Protocol1, Protocol>::value>::type* = 0)
     : basic_io_object<ASIO_SVC_T>(
-        other.get_service().get_io_context())
+        other.get_service().get_io_context()),
+      can_spawn_(false)
   {
     this->get_service().template converting_move_construct<Protocol1>(
         this->get_implementation(), other.get_implementation());
@@ -1219,7 +1226,8 @@ public:
       void (asio::error_code)> init(handler);
 
     this->get_service().async_accept(this->get_implementation(),
-        peer, static_cast<endpoint_type*>(0), init.completion_handler);
+        peer, static_cast<endpoint_type*>(0), init.completion_handler,
+        can_spawn_);
 
     return init.result.get();
 #endif // defined(ASIO_ENABLE_OLD_SERVICES)
@@ -1357,7 +1365,8 @@ public:
       void (asio::error_code)> init(handler);
 
     this->get_service().async_accept(this->get_implementation(),
-        peer, &peer_endpoint, init.completion_handler);
+        peer, &peer_endpoint, init.completion_handler,
+        can_spawn_);
 
     return init.result.get();
 #endif // defined(ASIO_ENABLE_OLD_SERVICES)
@@ -1460,7 +1469,7 @@ public:
    *
    * asio::ip::tcp::acceptor acceptor(io_context);
    * ...
-   * acceptor.async_accept(accept_handler);
+   * acceptor.:(accept_handler);
    * @endcode
    */
   template <typename MoveAcceptHandler>
@@ -1485,7 +1494,8 @@ public:
 
     this->get_service().async_accept(
         this->get_implementation(), static_cast<asio::io_context*>(0),
-        static_cast<endpoint_type*>(0), init.completion_handler);
+        static_cast<endpoint_type*>(0), init.completion_handler,
+        can_spawn_);
 
     return init.result.get();
 #endif // defined(ASIO_ENABLE_OLD_SERVICES)
@@ -1621,7 +1631,8 @@ public:
         typename Protocol::socket)> init(handler);
 
     this->get_service().async_accept(this->get_implementation(),
-        &io_context, static_cast<endpoint_type*>(0), init.completion_handler);
+        &io_context, static_cast<endpoint_type*>(0), init.completion_handler,
+        can_spawn_);
 
     return init.result.get();
 #endif // defined(ASIO_ENABLE_OLD_SERVICES)
@@ -1763,7 +1774,8 @@ public:
 
     this->get_service().async_accept(this->get_implementation(),
         static_cast<asio::io_context*>(0), &peer_endpoint,
-        init.completion_handler);
+        init.completion_handler,
+        can_spawn_);
 
     return init.result.get();
 #endif // defined(ASIO_ENABLE_OLD_SERVICES)
@@ -1917,12 +1929,16 @@ public:
         typename Protocol::socket)> init(handler);
 
     this->get_service().async_accept(this->get_implementation(),
-        &io_context, &peer_endpoint, init.completion_handler);
+        &io_context, &peer_endpoint, init.completion_handler,
+        can_spawn_);
 
     return init.result.get();
 #endif // defined(ASIO_ENABLE_OLD_SERVICES)
   }
 #endif // defined(ASIO_HAS_MOVE) || defined(GENERATING_DOCUMENTATION)
+
+private:
+  bool can_spawn_;
 };
 
 } // namespace asio

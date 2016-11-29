@@ -100,6 +100,7 @@ int main(int argc, char* argv[])
     }
 
     asio::io_context io_context;
+    io_context.set_spawn(true);
 
     server s(io_context, std::atoi(argv[1]));
 
