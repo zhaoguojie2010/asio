@@ -104,7 +104,7 @@ protected:
     // reset the service first
     scheduler* sched(static_cast<scheduler*>(owner));
     io_context* io_ctx(static_cast<io_context*>(&sched->context()));
-    Socket tmp(io_ctx);
+    Socket tmp(*io_ctx);
     peer_ = ASIO_MOVE_CAST(Socket)(tmp);
 
     do_assign();

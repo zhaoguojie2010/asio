@@ -23,7 +23,7 @@
 #include "asio/detail/reactor.hpp"
 #include "asio/detail/scheduler.hpp"
 #include "asio/detail/scheduler_thread_info.hpp"
-#include "asio/io_context.hpp"
+//#include "asio/io_context.hpp"
 
 #include "asio/detail/push_options.hpp"
 
@@ -402,9 +402,8 @@ std::size_t scheduler::do_run_one_thread_specific(
       distribute_event_.clear(distribute_lock_);
       distribute_event_.wait(distribute_lock_);
     }
-
-    return 0;
   }
+  return 0;
 }
 
 std::size_t scheduler::do_run_one(mutex::scoped_lock& lock,
