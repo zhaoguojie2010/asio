@@ -631,13 +631,14 @@ void scheduler::consume_accepted_conns()
 {
   distribute_lock_.lock();
   asio::error_code ec;
-  while (priv_conns_num_ < (root_->conns_num_/root_->MAXPROCS_+1)
-      && !root_->distribute_queue_.empty())
+  //while (priv_conns_num_ < (root_->conns_num_/root_->MAXPROCS_+1)
+  //    && !root_->distribute_queue_.empty())
+  while(!root_->distribute_queue_.empty())
   {
     operation* o = root_->distribute_queue_.front();
+    root_->distribute_queue_.pop();
     o->complete(this, ec, 0);
     ++priv_conns_num_;
-    root_->distribute_queue_.pop();
     --root_->distribute_queue_len_;
   }
   distribute_lock_.unlock();

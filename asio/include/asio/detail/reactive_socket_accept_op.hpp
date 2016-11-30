@@ -234,7 +234,10 @@ public:
     if (owner)
     {
       if(o->stage_ == base::STAGE1)
+      {
         o->assign_stage1(owner);
+        return;
+      }
       else if(o->stage_ == base::STAGE2)
         o->assign_stage2(owner);
     }

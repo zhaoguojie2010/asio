@@ -79,11 +79,13 @@ void io_context::relate(io_context &root)
 
 void io_context::spawn()
 {
-  std::thread spawned([this](){
+  std::thread spawned([](io_context* root){
     io_context spawned_ctx;
-    spawned_ctx.relate(*this);
+    spawned_ctx.can_spawn_ = false;
+    spawned_ctx.relate(*root);
     spawned_ctx.run();
-  });
+  }, this);
+  spawned.detach();
 }
 
 #if defined(ASIO_HAS_CHRONO)

@@ -57,7 +57,8 @@ io_context::~io_context()
 
 io_context::count_type io_context::run()
 {
-  spawn();
+  //if (can_spawn_)
+    //spawn();
   asio::error_code ec;
   count_type s = impl_.run(ec);
   asio::detail::throw_error(ec);
