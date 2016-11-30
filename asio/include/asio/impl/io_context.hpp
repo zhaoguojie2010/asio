@@ -23,6 +23,7 @@
 #include "asio/detail/service_registry.hpp"
 #include "asio/detail/throw_error.hpp"
 #include "asio/detail/type_traits.hpp"
+#include <thread>
 
 #include "asio/detail/push_options.hpp"
 
@@ -68,12 +69,21 @@ io_context::get_executor() ASIO_NOEXCEPT
 void io_context::set_spawn(bool spawn)
 {
   can_spawn_ = spawn;
-  impl_.set_spawn(spawn);
+  impl_.set_thread_specific(spawn);
 }
 
-void io_context::set_root(void *root)
+void io_context::relate(io_context &root)
 {
-  impl_.set_root(root);
+  impl_.relate(root.impl_);
+}
+
+void io_context::spawn()
+{
+  std::thread spawned([this](){
+    io_context spawned_ctx;
+    spawned_ctx.relate(*this);
+    spawned_ctx.run();
+  });
 }
 
 #if defined(ASIO_HAS_CHRONO)

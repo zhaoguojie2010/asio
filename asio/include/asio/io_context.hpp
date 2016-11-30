@@ -169,6 +169,8 @@ public:
   class strand;
 #endif // !defined(ASIO_NO_EXTENSIONS)
 
+  friend class io_context;
+
   /// The type used to count the number of handlers executed by the context.
   typedef std::size_t count_type;
 
@@ -224,8 +226,11 @@ public:
   /// so no lock is needed.
   void set_spawn(bool spawn);
 
-  /// set the current io_context's scheduler's root
-  void set_root(void* root);
+  /// spawn new io_context
+  void spawn();
+
+  /// setup relationship with root io_context
+  void relate(io_context& root);
 
   bool can_spawn()
   {

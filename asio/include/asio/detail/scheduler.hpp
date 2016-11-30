@@ -205,11 +205,14 @@ public:
   // consume accepted connections from distribute_queue_
   void consume_accepted_conns();
 
+  // set up relationship with root scheduler
+  void relate(scheduler& root);
+
   // push the accept op to distribute_queue_
   void distribute(operation* op);
 
-  // set spawn
-  void set_spawn(bool b);
+  // set one thread
+  void set_thread_specific(bool b);
 
   // set root
   void set_root(void* root)
@@ -241,7 +244,10 @@ private:
   // number of operations(connections) in the distribute_queue_;
   int distribute_queue_len_;
 
-  // indicates if new scheduler can be spawned
+  // if true, scheduler will run in one thread only
+  bool thread_specific_;
+
+  // indicates if new io_context can be spawned from current scheduler
   bool can_spawn_;
 
   // we can only spawn MAXPROCS_-1 new schedulers which run in their own

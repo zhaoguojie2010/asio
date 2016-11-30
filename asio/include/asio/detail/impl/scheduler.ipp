@@ -100,6 +100,8 @@ scheduler::scheduler(
     shutdown_(false),
     concurrency_hint_(concurrency_hint),
     can_spawn_(false),
+    thread_specific_(false),
+    distribute_queue_len_(0),
     MAXPROCS_(10),
     current_procs_(0),
     conns_num_(0),
@@ -108,6 +110,15 @@ scheduler::scheduler(
     root_(this)
 {
   ASIO_HANDLER_TRACKING_INIT;
+}
+
+void scheduler::relate(scheduler& root)
+{
+  can_spawn_ = root.can_spawn_;
+  thread_specific_ = root.thread_specific_;
+  root_ = &root;
+
+  init_task();
 }
 
 void scheduler::shutdown()
@@ -154,7 +165,7 @@ std::size_t scheduler::run(asio::error_code& ec)
   thread_call_stack::context ctx(this, this_thread);
 
   std::size_t n = 0;
-  if(!can_spawn_)
+  if(!thread_specific_)
   {
     mutex::scoped_lock lock(mutex_);
 
@@ -634,10 +645,7 @@ void scheduler::consume_accepted_conns()
 
 void scheduler::spawn()
 {
-  asio::io_context spawned;
-  spawned.set_spawn(true);
-  spawned.set_root(this);
-  spawned.run();
+  // TODO: spawn the whole io_context from here
 }
 
 // this can only be called by the root scheduler
@@ -662,9 +670,10 @@ void scheduler::distribute(operation* op)
   }
 }
 
-void scheduler::set_spawn(bool b)
+void scheduler::set_thread_specific(bool b)
 {
-  can_spawn_ = b;
+  thread_specific_ = b;
+  one_thread_ = b;
   //one_thread_ = can_spawn_ ? true:one_thread_;
 }
 
