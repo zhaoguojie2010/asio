@@ -302,6 +302,11 @@ void scheduler::compensating_work_started()
 void scheduler::post_immediate_completion(
     scheduler::operation* op, bool is_continuation)
 {
+  if (thread_specific_)
+  {
+    op_queue_.push(op);
+    return;
+  }
 #if defined(ASIO_HAS_THREADS)
   if (one_thread_ || is_continuation)
   {
@@ -390,7 +395,6 @@ std::size_t scheduler::do_run_one_thread_specific(
 
       if (o == &task_operation_)
       {
-        std::cout << "task_op" << std::endl;
         // try to get new accepted connections from distribute_queue_
         consume_accepted_conns();
 
@@ -407,7 +411,6 @@ std::size_t scheduler::do_run_one_thread_specific(
 
         // Complete the operation. May throw an exception. Deletes the object.
         o->complete(this, ec, task_result);
-        std::cout << "after complete" << std::endl;
         return 1;
       }
     }

@@ -39,12 +39,8 @@ int main(int argc, char* argv[])
     std::cout << "length= " << request_length << std::endl;
     while(true){
         asio::write(s, asio::buffer(request, request_length));
-        std::cout << "write done" << std::endl;
         size_t reply_length = asio::read(s,
             asio::buffer(reply, request_length));
-        std::cout << "Reply is: ";
-        std::cout.write(reply, reply_length);
-        std::cout << "\n";
     }
   }
   catch (std::exception& e)
