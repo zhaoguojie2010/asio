@@ -106,7 +106,7 @@ scheduler::scheduler(
     current_procs_(0),
     conns_num_(0),
     priv_conns_num_(0),
-    distribute_lock_(distribute_mutex_),
+    distribute_lock_(distribute_mutex_, distribute_lock_.adopt_lock),
     root_(this)
 {
   ASIO_HANDLER_TRACKING_INIT;
