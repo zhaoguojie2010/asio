@@ -390,16 +390,13 @@ std::size_t scheduler::do_run_one_thread_specific(
 
       if (o == &task_operation_)
       {
-        bool more_handlers = !op_queue_.empty();
         std::cout << "task_op" << std::endl;
         // try to get new accepted connections from distribute_queue_
         consume_accepted_conns();
-        std::cout << "after consume" << std::endl;
 
-
+        bool more_handlers = !op_queue_.empty();
         // wait at most 100ms
         task_->run(more_handlers ? 0 : -1, op_queue_);
-        std::cout << "after epoll run" << std::endl;
 
         // finally, push the task_operation_ into distribute_queue
         op_queue_.push(&task_operation_);
@@ -409,7 +406,6 @@ std::size_t scheduler::do_run_one_thread_specific(
         std::size_t task_result = o->task_result_;
 
         // Complete the operation. May throw an exception. Deletes the object.
-        std::cout << "complete" << std::endl;
         o->complete(this, ec, task_result);
         std::cout << "after complete" << std::endl;
         return 1;

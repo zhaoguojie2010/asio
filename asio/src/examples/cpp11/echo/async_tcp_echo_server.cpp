@@ -33,10 +33,12 @@ public:
 private:
   void do_read()
   {
+    std::cout << "rrrrr\n";
     auto self(shared_from_this());
     socket_.async_read_some(asio::buffer(data_, max_length),
         [this, self](std::error_code ec, std::size_t length)
         {
+          std::cout << "do_read\n";
           if (!ec)
           {
             do_write(length);
@@ -46,10 +48,12 @@ private:
 
   void do_write(std::size_t length)
   {
+    std::cout  << "wwwww\n";
     auto self(shared_from_this());
     asio::async_write(socket_, asio::buffer(data_, length),
         [this, self](std::error_code ec, std::size_t /*length*/)
         {
+          std::cout << "do_write\n";
           if (!ec)
           {
             do_read();
@@ -77,8 +81,10 @@ private:
     acceptor_.async_accept(
         [this](std::error_code ec, tcp::socket socket)
         {
+          std::cout << "async_accept\n";
           if (!ec)
           {
+            std::cout <<"std::make_shared<session>(std::move(socket))->start();\n";
             std::make_shared<session>(std::move(socket))->start();
           }
 
