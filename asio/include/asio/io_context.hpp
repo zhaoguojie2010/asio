@@ -169,8 +169,6 @@ public:
   class strand;
 #endif // !defined(ASIO_NO_EXTENSIONS)
 
-  friend class io_context;
-
   /// The type used to count the number of handlers executed by the context.
   typedef std::size_t count_type;
 

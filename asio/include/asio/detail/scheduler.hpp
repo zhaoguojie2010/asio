@@ -201,7 +201,6 @@ private:
   const int concurrency_hint_;
 
 public:
-  friend class scheduler;
   mutex::scoped_lock distribute_lock_;
   // consume accepted connections from distribute_queue_
   void consume_accepted_conns();
