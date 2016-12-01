@@ -233,13 +233,18 @@ public:
     // On success, assign new connection to peer socket object.
     if (owner)
     {
-      if(o->stage_ == base::STAGE1)
+      if (o->mode_ == base::LOCK_FREE)
       {
-        o->assign_stage1(owner);
-        return;
+        if (o->stage_ == base::STAGE1) {
+          o->assign_stage1(owner);
+          return;
+        } else if (o->stage_ == base::STAGE2)
+          o->assign_stage2(owner);
       }
-      else if(o->stage_ == base::STAGE2)
-        o->assign_stage2(owner);
+      else
+      {
+        o->do_assign();
+      }
     }
 
     ASIO_HANDLER_COMPLETION((*o));

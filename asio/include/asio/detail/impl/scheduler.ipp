@@ -390,11 +390,16 @@ std::size_t scheduler::do_run_one_thread_specific(
 
       if (o == &task_operation_)
       {
-        // wait at most 100ms
-        task_->run(100, op_queue_);
-
+        bool more_handlers = !op_queue_.empty();
+        std::cout << "task_op" << std::endl;
         // try to get new accepted connections from distribute_queue_
         consume_accepted_conns();
+        std::cout << "after consume" << std::endl;
+
+
+        // wait at most 100ms
+        task_->run(more_handlers ? 0 : -1, op_queue_);
+        std::cout << "after epoll run" << std::endl;
 
         // finally, push the task_operation_ into distribute_queue
         op_queue_.push(&task_operation_);
@@ -404,7 +409,9 @@ std::size_t scheduler::do_run_one_thread_specific(
         std::size_t task_result = o->task_result_;
 
         // Complete the operation. May throw an exception. Deletes the object.
+        std::cout << "complete" << std::endl;
         o->complete(this, ec, task_result);
+        std::cout << "after complete" << std::endl;
         return 1;
       }
     }
@@ -635,6 +642,7 @@ void scheduler::consume_accepted_conns()
   //    && !root_->distribute_queue_.empty())
   while(!root_->distribute_queue_.empty())
   {
+    std::cout << "consume" << std::endl;
     operation* o = root_->distribute_queue_.front();
     root_->distribute_queue_.pop();
     o->complete(this, ec, 0);
@@ -674,8 +682,8 @@ void scheduler::distribute(operation* op)
 void scheduler::set_thread_specific(bool b)
 {
   thread_specific_ = b;
-  one_thread_ = b;
-  //one_thread_ = can_spawn_ ? true:one_thread_;
+  if (b)
+    one_thread_ = b;
 }
 
 } // namespace detail
