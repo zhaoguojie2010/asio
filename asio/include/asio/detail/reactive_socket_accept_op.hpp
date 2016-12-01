@@ -236,10 +236,14 @@ public:
       if (o->mode_ == base::LOCK_FREE)
       {
         if (o->stage_ == base::STAGE1) {
+          //std::cout << "stage1 \n";
           o->assign_stage1(owner);
           return;
         } else if (o->stage_ == base::STAGE2)
+        {
+          //std::cout << "stage2\n";
           o->assign_stage2(owner);
+        }
       }
       else
       {

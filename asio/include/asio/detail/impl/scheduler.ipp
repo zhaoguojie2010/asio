@@ -329,6 +329,11 @@ void scheduler::post_immediate_completion(
 
 void scheduler::post_deferred_completion(scheduler::operation* op)
 {
+  if (thread_specific_)
+  {
+    op_queue_.push(op);
+    return;
+  }
 #if defined(ASIO_HAS_THREADS)
   if (one_thread_)
   {
@@ -348,6 +353,11 @@ void scheduler::post_deferred_completion(scheduler::operation* op)
 void scheduler::post_deferred_completions(
     op_queue<scheduler::operation>& ops)
 {
+  if (thread_specific_)
+  {
+    op_queue_.push(ops);
+    return;
+  }
   if (!ops.empty())
   {
 #if defined(ASIO_HAS_THREADS)
@@ -647,6 +657,7 @@ void scheduler::consume_accepted_conns()
     o->complete(this, ec, 0);
     ++priv_conns_num_;
     --root_->distribute_queue_len_;
+    break;
   }
   distribute_lock_.unlock();
 }
