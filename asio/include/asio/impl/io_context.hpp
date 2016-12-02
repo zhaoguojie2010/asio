@@ -79,6 +79,7 @@ void io_context::relate(io_context &root)
 
 void io_context::spawn()
 {
+  std::cout << "spawn\n";
   std::thread spawned([](io_context* root){
     io_context spawned_ctx;
     spawned_ctx.can_spawn_ = false;

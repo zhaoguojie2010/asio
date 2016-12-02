@@ -23,7 +23,8 @@
 #include "asio/detail/reactor.hpp"
 #include "asio/detail/scheduler.hpp"
 #include "asio/detail/scheduler_thread_info.hpp"
-//#include "asio/io_context.hpp"
+
+#include <thread>
 
 #include "asio/detail/push_options.hpp"
 
@@ -102,7 +103,7 @@ scheduler::scheduler(
     can_spawn_(false),
     thread_specific_(false),
     distribute_queue_len_(0),
-    MAXPROCS_(10),
+    MAXPROCS_(2),
     current_procs_(0),
     conns_num_(0),
     priv_conns_num_(0),
@@ -118,7 +119,8 @@ void scheduler::relate(scheduler& root)
   thread_specific_ = root.thread_specific_;
   root_ = &root;
 
-  init_task();
+  task_ = &use_service<reactor>(this->context());
+  work_started();
 }
 
 void scheduler::shutdown()
@@ -409,11 +411,12 @@ std::size_t scheduler::do_run_one_thread_specific(
         consume_accepted_conns();
 
         bool more_handlers = !op_queue_.empty();
-        // wait at most 100ms
         task_->run(more_handlers ? 0 : -1, op_queue_);
 
         // finally, push the task_operation_ into distribute_queue
         op_queue_.push(&task_operation_);
+        // TODO: call wait when no descriptor is registered to
+        // TODO: the current epoll_fd
       }
       else
       {
@@ -427,9 +430,13 @@ std::size_t scheduler::do_run_one_thread_specific(
     else
     {
       distribute_event_.clear(distribute_lock_);
+      //std::cout << "thread " << std::this_thread::get_id() << " wait\n";
       distribute_event_.wait(distribute_lock_);
+      //std::cout << "thread " << std::this_thread::get_id() << " wake up\n";
+      op_queue_.push(&task_operation_);
     }
   }
+  std::cout << "thread " << std::this_thread::get_id() << " exit\n";
   return 0;
 }
 
@@ -649,15 +656,22 @@ void scheduler::consume_accepted_conns()
   asio::error_code ec;
   //while (priv_conns_num_ < (root_->conns_num_/root_->MAXPROCS_+1)
   //    && !root_->distribute_queue_.empty())
-  while(!root_->distribute_queue_.empty())
+  if (!root_->distribute_queue_.empty())
   {
-    std::cout << "consume" << std::endl;
-    operation* o = root_->distribute_queue_.front();
-    root_->distribute_queue_.pop();
-    o->complete(this, ec, 0);
-    ++priv_conns_num_;
-    --root_->distribute_queue_len_;
-    break;
+    if (priv_conns_num_ < ((root_->conns_num_+1)/root_->MAXPROCS_))
+    {
+      //std::cout << "consume" << std::endl;
+      operation *o = root_->distribute_queue_.front();
+      root_->distribute_queue_.pop();
+      o->complete(this, ec, 0);
+      ++priv_conns_num_;
+      --root_->distribute_queue_len_;
+    }
+    else
+    {
+      //std::cout << "signal\n";
+      distribute_event_.unlock_and_signal_one(distribute_lock_);
+    }
   }
   distribute_lock_.unlock();
 }
@@ -674,18 +688,12 @@ void scheduler::distribute(operation* op)
   distribute_queue_.push(op);
   ++conns_num_;
   ++distribute_queue_len_;
+  //std::cout << "queue len = " << distribute_queue_len_ << std::endl;
   distribute_lock_.unlock();
 
   if (root_->distribute_queue_len_ > 1)
   {
-    if (root_->current_procs_ < root_->MAXPROCS_)
-    {
-      // spawn new scheduler
-      spawn();
-    }
-    else{
-      distribute_event_.unlock_and_signal_one(distribute_lock_);
-    }
+    distribute_event_.unlock_and_signal_one(distribute_lock_);
   }
 }
 

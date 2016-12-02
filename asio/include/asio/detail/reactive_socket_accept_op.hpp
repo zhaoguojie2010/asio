@@ -59,7 +59,6 @@ public:
         o->peer_endpoint_ ? &o->addrlen_ : 0, o->ec_, new_socket)
     ? done : not_done;
     o->new_socket_.reset(new_socket);
-
     ASIO_HANDLER_REACTOR_OPERATION((*o, "non_blocking_accept", o->ec_));
     o->next_stage();
     return result;
