@@ -203,7 +203,7 @@ private:
 public:
   mutex::scoped_lock distribute_lock_;
   // consume accepted connections from distribute_queue_
-  void consume_accepted_conns();
+  bool consume_accepted_conns();
 
   // set up relationship with root scheduler
   void relate(scheduler& root);
@@ -266,8 +266,8 @@ private:
   // root_ is the first scheduler that spawns other schedulers
   scheduler* root_;
 };
-conditionally_enabled_mutex scheduler::distribute_mutex_(true);
-conditionally_enabled_event scheduler::distribute_event_;
+scheduler::mutex scheduler::distribute_mutex_(true);
+scheduler::event scheduler::distribute_event_;
 //op_queue<scheduler::operation> scheduler::distribute_queue_;
 //int scheduler::distribute_queue_len_ = 0;
 

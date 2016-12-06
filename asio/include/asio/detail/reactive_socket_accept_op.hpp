@@ -90,8 +90,11 @@ protected:
     if (new_socket_.get() != invalid_socket)
     {
       scheduler* sched(static_cast<scheduler*>(owner));
-      sched->distribute(this);
+
+      // has to change to next stage before distribute, otherwise
+      // the spawned scheduler might consume a op still in stage 1
       next_stage();
+      sched->distribute(this);
     }
   }
 
@@ -235,12 +238,11 @@ public:
       if (o->mode_ == base::LOCK_FREE)
       {
         if (o->stage_ == base::STAGE1) {
-          //std::cout << "stage1 \n";
           o->assign_stage1(owner);
           return;
-        } else if (o->stage_ == base::STAGE2)
+        }
+        else if (o->stage_ == base::STAGE2)
         {
-          //std::cout << "stage2\n";
           o->assign_stage2(owner);
         }
       }
@@ -249,7 +251,6 @@ public:
         o->do_assign();
       }
     }
-
     ASIO_HANDLER_COMPLETION((*o));
 
     // Take ownership of the handler object.
